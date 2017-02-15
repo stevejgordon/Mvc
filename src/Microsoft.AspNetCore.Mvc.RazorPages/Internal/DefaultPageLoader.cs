@@ -2,10 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc.Razor.Compilation;
 using Microsoft.AspNetCore.Mvc.Razor.Internal;
 using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
@@ -16,95 +12,84 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 {
     public class DefaultPageLoader : IPageLoader
     {
-        private readonly RazorCompilationService _razorCompilationService;
+        private const string PageImportsFileName = "_PageImports.cshtml";
+        private readonly RazorEngine _razorEngine;
+        private readonly RazorProject _razorProject;
         private readonly ICompilationService _compilationService;
-        private readonly RazorProject _project;
+        private readonly ICompilerCacheProvider _compilerCacheProvider;
+        private readonly Func<string, CompilationResultSource> _getCompilationResultSourceDelegate;
+        private readonly Func<MvcRazorCompilation, CompilationResult> _getCompilationResultDelegate;
         private readonly ILogger _logger;
+        private ICompilerCache _compilerCache;
 
         public DefaultPageLoader(
-            IRazorCompilationService razorCompilationService,
-            ICompilationService compilationService,
+            RazorEngine razorEngine,
             RazorProject razorProject,
+            ICompilationService compilationService,
+            ICompilerCacheProvider compilerCacheProvider,
             ILogger<DefaultPageLoader> logger)
         {
-            _razorCompilationService = (RazorCompilationService)razorCompilationService;
+            _razorEngine = razorEngine;
+            _razorProject = razorProject;
             _compilationService = compilationService;
-            _project = razorProject;
+            _compilerCacheProvider = compilerCacheProvider;
+            _getCompilationResultSourceDelegate = GetCompilationSource;
+            _getCompilationResultDelegate = GetCompilationResult;
             _logger = logger;
+        }
+
+        private ICompilerCache CompilerCache
+        {
+            get
+            {
+                if (_compilerCache == null)
+                {
+                    _compilerCache = _compilerCacheProvider.Cache;
+                }
+
+                return _compilerCache;
+            }
         }
 
         public Type Load(PageActionDescriptor actionDescriptor)
         {
-            var item = _project.GetItem(actionDescriptor.RelativePath);
+            var item = _razorProject.GetItem(actionDescriptor.RelativePath);
             if (!item.Exists)
             {
                 throw new InvalidOperationException($"File {actionDescriptor.RelativePath} was not found.");
             }
 
-            RazorCodeDocument codeDocument;
-            RazorCSharpDocument cSharpDocument;
-            _logger.RazorFileToCodeCompilationStart(item.Path);
+            var cacheResult = CompilerCache.GetOrAdd(actionDescriptor.RelativePath, _getCompilationResultSourceDelegate);
+            return cacheResult.CompiledType;
+        }
 
-            var startTimestamp = _logger.IsEnabled(LogLevel.Debug) ? Stopwatch.GetTimestamp() : 0;
+        private CompilationResultSource GetCompilationSource(string path)
+        {
+            var projectItem = _razorProject.GetItem(path);
+            var viewStartItems = _razorProject.FindHierarchicalItems(path, PageImportsFileName);
+            var compilation = new MvcRazorCompilation(_razorEngine, projectItem, viewStartItems);
+            return new CompilationResultSource(compilation, GetCompilationResult);
+        }
 
-            codeDocument = CreateCodeDocument(item);
-            cSharpDocument = _razorCompilationService.ProcessCodeDocument(codeDocument);
-
-            _logger.RazorFileToCodeCompilationEnd(item.Path, startTimestamp);
+        private CompilationResult GetCompilationResult(MvcRazorCompilation razorCompilation)
+        {
+            var projectItem = razorCompilation.ProjectItem;
+            var codeDocument = razorCompilation.CreateCodeDocument();
+            var csharpDocument = razorCompilation.CreateCSharpDocument(codeDocument);
 
             CompilationResult compilationResult;
-            if (cSharpDocument.Diagnostics.Count > 0)
+            if (csharpDocument.Diagnostics.Count > 0)
             {
-                compilationResult = _razorCompilationService.GetCompilationFailedResult(item.Path, cSharpDocument.Diagnostics);
+                compilationResult = CompilationResultFactory.FromRazorErrors(
+                    _razorProject, projectItem.Path,
+                    csharpDocument.Diagnostics);
             }
             else
             {
-                compilationResult = _compilationService.Compile(codeDocument, cSharpDocument);
+                compilationResult = _compilationService.Compile(codeDocument, csharpDocument);
             }
 
-            compilationResult.EnsureSuccessful();
-            return compilationResult.CompiledType;
-        }
-
-        private RazorCodeDocument CreateCodeDocument(RazorProjectItem item)
-        {
-            var absolutePath = GetItemPath(item);
-
-            RazorSourceDocument source;
-            using (var inputStream = item.Read())
-            {
-                source = RazorSourceDocument.ReadFrom(inputStream, absolutePath);
-            }
-
-            var imports = new List<RazorSourceDocument>()
-            {
-                _razorCompilationService.GlobalImports,
-            };
-
-            var pageImports = _project.FindHierarchicalItems(item.Path, "_PageImports.cshtml");
-            foreach (var pageImport in pageImports.Reverse())
-            {
-                if (pageImport.Exists)
-                {
-                    using (var stream = pageImport.Read())
-                    {
-                        imports.Add(RazorSourceDocument.ReadFrom(stream, GetItemPath(item)));
-                    }
-                }
-            }
-
-            return RazorCodeDocument.Create(source, imports);
-        }
-
-        private static string GetItemPath(RazorProjectItem item)
-        {
-            var absolutePath = item.Path;
-            if (item.Exists && string.IsNullOrEmpty(item.PhysicalPath))
-            {
-                absolutePath = item.PhysicalPath;
-            }
-
-            return absolutePath;
+            return compilationResult;
         }
     }
 }

@@ -67,7 +67,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         /// <inheritdoc />
         public CompilerCacheResult GetOrAdd(
             string relativePath,
-            Func<RelativeFileInfo, CompilationResult> compile)
+            Func<string, CompilationResultSource> compile)
         {
             if (relativePath == null)
             {
@@ -99,12 +99,12 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         private Task<CompilerCacheResult> CreateCacheEntry(
             string relativePath,
             string normalizedPath,
-            Func<RelativeFileInfo, CompilationResult> compile)
+            Func<string, CompilationResultSource> compilationSourceFactory)
         {
             TaskCompletionSource<CompilerCacheResult> compilationTaskSource = null;
-            MemoryCacheEntryOptions cacheEntryOptions = null;
-            IFileInfo fileInfo = null;
+            MemoryCacheEntryOptions cacheEntryOptions;
             Task<CompilerCacheResult> cacheEntry;
+            CompilationResultSource compilationResultSource;
 
             // Safe races cannot be allowed when compiling Razor pages. To ensure only one compilation request succeeds
             // per file, we'll lock the creation of a cache entry. Creating the cache entry should be very quick. The
@@ -125,37 +125,37 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
                     throw new InvalidOperationException(message);
                 }
 
-                fileInfo = _fileProvider.GetFileInfo(normalizedPath);
-                if (!fileInfo.Exists)
-                {
-                    var expirationToken = _fileProvider.Watch(normalizedPath);
-                    cacheEntry = Task.FromResult(new CompilerCacheResult(new[] { expirationToken }));
+                cacheEntryOptions = new MemoryCacheEntryOptions();
 
-                    cacheEntryOptions = new MemoryCacheEntryOptions();
-                    cacheEntryOptions.AddExpirationToken(expirationToken);
+                compilationResultSource = compilationSourceFactory(normalizedPath);
+                var razorCompilation = compilationResultSource.RazorCompilation;
+                cacheEntryOptions.ExpirationTokens.Add(_fileProvider.Watch(razorCompilation.ProjectItem.Path));
+                if (!razorCompilation.ProjectItem.Exists)
+                {
+                    cacheEntry = Task.FromResult(new CompilerCacheResult(cacheEntryOptions.ExpirationTokens));
                 }
                 else
                 {
-                    cacheEntryOptions = GetMemoryCacheEntryOptions(normalizedPath);
-
                     // A file exists and needs to be compiled.
                     compilationTaskSource = new TaskCompletionSource<CompilerCacheResult>();
+                    foreach (var projectItem in razorCompilation.Imports)
+                    {
+                        cacheEntryOptions.ExpirationTokens.Add(_fileProvider.Watch(projectItem.Path));
+                    }
                     cacheEntry = compilationTaskSource.Task;
                 }
 
-                cacheEntry = _cache.Set<Task<CompilerCacheResult>>(normalizedPath, cacheEntry, cacheEntryOptions);
+                cacheEntry = _cache.Set(normalizedPath, cacheEntry, cacheEntryOptions);
             }
 
             if (compilationTaskSource != null)
             {
-                // Indicates that the file was found and needs to be compiled.
-                Debug.Assert(fileInfo != null && fileInfo.Exists);
+                // Indicates that a file was found and needs to be compiled.
                 Debug.Assert(cacheEntryOptions != null);
-                var relativeFileInfo = new RelativeFileInfo(fileInfo, normalizedPath);
-
+                
                 try
                 {
-                    var compilationResult = compile(relativeFileInfo);
+                    var compilationResult = compilationResultSource.Compile(compilationResultSource.RazorCompilation);
                     compilationResult.EnsureSuccessful();
                     compilationTaskSource.SetResult(
                         new CompilerCacheResult(relativePath, compilationResult, cacheEntryOptions.ExpirationTokens));
@@ -167,20 +167,6 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
             }
 
             return cacheEntry;
-        }
-
-        private MemoryCacheEntryOptions GetMemoryCacheEntryOptions(string relativePath)
-        {
-            var options = new MemoryCacheEntryOptions();
-            options.AddExpirationToken(_fileProvider.Watch(relativePath));
-
-            var viewImportsPaths = ViewHierarchyUtility.GetViewImportsLocations(relativePath);
-            foreach (var location in viewImportsPaths)
-            {
-                options.AddExpirationToken(_fileProvider.Watch(location));
-            }
-
-            return options;
         }
 
         private string GetNormalizedPath(string relativePath)
