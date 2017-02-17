@@ -13,15 +13,10 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Compilation
         /// <summary>
         /// Compiles a <see cref="RazorCSharpDocument"/>  and returns the result of compilation.
         /// </summary>
-        /// <param name="codeDocument">
-        /// The <see cref="RazorCodeDocument"/> that contains the sources for the compilation. 
-        /// </param>
-        /// <param name="cSharpDocument">
-        /// The <see cref="RazorCSharpDocument"/> to compile. 
-        /// </param>
+        /// <param name="templateEngineResult">The <see cref="RazorTemplateEngineResult"/>.</param>
         /// <returns>
         /// A <see cref="CompilationResult"/> representing the result of compilation.
         /// </returns>
-        CompilationResult Compile(RazorCodeDocument codeDocument, RazorCSharpDocument cSharpDocument);
+        CompilationResult Compile(RazorTemplateEngineResult templateEngineResult);
     }
 }

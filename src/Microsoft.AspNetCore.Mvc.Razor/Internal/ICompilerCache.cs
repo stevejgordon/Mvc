@@ -20,6 +20,6 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         /// <returns>A cached <see cref="CompilationResult"/>.</returns>
         CompilerCacheResult GetOrAdd(
             string relativePath,
-            Func<string, CompilationResultSource> compile);
+            Func<string, CompilerCacheContext> compile);
     }
 }

@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Razor.Internal;
@@ -9,46 +8,32 @@ using Microsoft.AspNetCore.Razor.Evolution;
 
 namespace Microsoft.AspNetCore.Mvc.Razor.Compilation
 {
-    public class MvcRazorCompilation : RazorCompilation
+    public class MvcRazorTemplateEngine : RazorTemplateEngine
     {
-        private static readonly RazorSourceDocument DefaultImports = GetDefaultImports();
-
-        public MvcRazorCompilation(
+        public MvcRazorTemplateEngine(
             RazorEngine engine,
-            RazorProjectItem projectItem,
-            IEnumerable<RazorProjectItem> imports)
-            : base(engine, projectItem)
+            RazorProject project)
+            : base(engine, project)
         {
-            Imports = imports;
         }
 
-        public RazorSourceDocument GlobalImports { get; set; } = DefaultImports;
+        public static RazorSourceDocument DefaultImports { get; } = GetDefaultImports();
 
-        public IEnumerable<RazorProjectItem> Imports { get; }
-
-        public override RazorCodeDocument CreateCodeDocument()
+        public static RazorTemplateEngineOptions MvcViewsTemplateEngineOptions { get; } = new RazorTemplateEngineOptions
         {
-            var codeDocument = base.CreateCodeDocument();
-            codeDocument.SetRelativePath(ProjectItem.Path);
-            return codeDocument;
-        }
+            DefaultImports = DefaultImports,
+            ImportsFileName = "_ViewImports.cshtml",
+        };
 
-        protected override IEnumerable<RazorSourceDocument> GetImports()
+        public static RazorTemplateEngineOptions RazorPagesTemplateEngineOptions { get; } = new RazorTemplateEngineOptions
         {
-            var imports = new List<RazorSourceDocument>()
-            {
-                GlobalImports,
-            };
+            DefaultImports = DefaultImports,
+            ImportsFileName = "_PageImports.cshtml",
+        };
 
-            foreach (var item in Imports)
-            {
-                if (item.Exists)
-                {
-                    imports.Add(CreateSourceDocument(item));
-                }
-            }
-
-            return imports;
+        protected override RazorCodeDocument CreateCodeDocument(RazorProjectItem projectItem, RazorTemplateEngineOptions options)
+        {
+            return base.CreateCodeDocument(projectItem, options);
         }
 
         private static RazorSourceDocument GetDefaultImports()

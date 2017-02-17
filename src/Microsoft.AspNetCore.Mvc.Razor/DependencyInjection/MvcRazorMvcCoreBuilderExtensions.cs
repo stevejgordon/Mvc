@@ -137,6 +137,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.TryAddSingleton<RazorReferenceManager>();
             // This caches compilation related details that are valid across the lifetime of the application.
             services.TryAddSingleton<ICompilationService, DefaultRoslynCompilationService>();
+            services.TryAddSingleton<MvcRazorTemplateEngine>();
 
             services.TryAddEnumerable(
                 ServiceDescriptor.Transient<IConfigureOptions<MvcViewOptions>, MvcRazorMvcViewOptionsSetup>());

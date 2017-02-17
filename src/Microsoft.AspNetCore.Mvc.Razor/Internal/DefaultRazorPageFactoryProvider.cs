@@ -5,7 +5,6 @@ using System;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.Razor.Compilation;
-using Microsoft.AspNetCore.Razor.Evolution;
 
 namespace Microsoft.AspNetCore.Mvc.Razor.Internal
 {
@@ -15,34 +14,29 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
     /// </summary>
     public class DefaultRazorPageFactoryProvider : IRazorPageFactoryProvider
     {
-        private const string ViewImportsFileName = "_ViewImports.cshtml";
-        private readonly RazorEngine _razorEngine;
-        private readonly RazorProject _razorProject;
+        private readonly MvcRazorTemplateEngine _templateEngine;
         private readonly ICompilationService _compilationService;
         private readonly ICompilerCacheProvider _compilerCacheProvider;
-        private readonly Func<string, CompilationResultSource> _getCompilationResultSourceDelegate;
-        private readonly Func<MvcRazorCompilation, CompilationResult> _getCompilationResultDelegate;
+        private readonly Func<string, CompilerCacheContext> _getCacheContext;
+        private readonly Func<CompilerCacheContext, CompilationResult> _getCompilationResultDelegate;
 
         private ICompilerCache _compilerCache;
 
         /// <summary>
         /// Initializes a new instance of <see cref="DefaultRazorPageFactoryProvider"/>.
         /// </summary>
-        /// <param name="razorEngine">The <see cref="RazorEngine"/>.</param>
-        /// <param name="razorProject">The <see cref="RazorProject"/>.</param>
+        /// <param name="templateEngine">The <see cref="MvcRazorTemplateEngine"/>.</param>
         /// <param name="compilationService">The <see cref="ICompilationService"/>.</param>
         /// <param name="compilerCacheProvider">The <see cref="ICompilerCacheProvider"/>.</param>
         public DefaultRazorPageFactoryProvider(
-            RazorEngine razorEngine,
-            RazorProject razorProject,
+            MvcRazorTemplateEngine templateEngine,
             ICompilationService compilationService,
             ICompilerCacheProvider compilerCacheProvider)
         {
-            _razorEngine = razorEngine;
-            _razorProject = razorProject;
+            _templateEngine = templateEngine;
             _compilationService = compilationService;
             _compilerCacheProvider = compilerCacheProvider;
-            _getCompilationResultSourceDelegate = GetCompilationSource;
+            _getCacheContext = GetCacheContext;
             _getCompilationResultDelegate = GetCompilationResult;
         }
 
@@ -73,7 +67,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
                 relativePath = relativePath.Substring(1);
             }
 
-            var result = CompilerCache.GetOrAdd(relativePath, _getCompilationResultSourceDelegate);
+            var result = CompilerCache.GetOrAdd(relativePath, _getCacheContext);
             if (result.Success)
             {
                 var compiledType = result.CompiledType;
@@ -95,30 +89,33 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
             }
         }
 
-        private CompilationResultSource GetCompilationSource(string path)
+        private CompilerCacheContext GetCacheContext(string path)
         {
-            var projectItem = _razorProject.GetItem(path);
-            var viewStartItems = _razorProject.FindHierarchicalItems(path, ViewImportsFileName);
-            var compilation = new MvcRazorCompilation(_razorEngine, projectItem, viewStartItems);
-            return new CompilationResultSource(compilation, GetCompilationResult);
+            var item = _templateEngine.Project.GetItem(path);
+            var imports = _templateEngine.Project.FindHierarchicalItems(
+                path, 
+                MvcRazorTemplateEngine.MvcViewsTemplateEngineOptions.ImportsFileName);
+
+            return new CompilerCacheContext(item, imports, GetCompilationResult);
         }
 
-        private CompilationResult GetCompilationResult(MvcRazorCompilation razorCompilation)
+        private CompilationResult GetCompilationResult(CompilerCacheContext cacheContext)
         {
-            var projectItem = razorCompilation.ProjectItem;
-            var codeDocument = razorCompilation.CreateCodeDocument();
-            var csharpDocument = razorCompilation.CreateCSharpDocument(codeDocument);
+            var projectItem = cacheContext.ProjectItem;
+            var templateEngineResult = _templateEngine.GenerateCode(projectItem.Path, MvcRazorTemplateEngine.MvcViewsTemplateEngineOptions);
+            var csharpDocument = templateEngineResult.CSharpDocument;
 
             CompilationResult compilationResult;
             if (csharpDocument.Diagnostics.Count > 0)
             {
                 compilationResult = CompilationResultFactory.FromRazorErrors(
-                    _razorProject, projectItem.Path, 
+                    _templateEngine.Project, 
+                    projectItem.Path,
                     csharpDocument.Diagnostics);
             }
             else
             {
-                compilationResult = _compilationService.Compile(codeDocument, csharpDocument);
+                compilationResult = _compilationService.Compile(templateEngineResult);
             }
 
             return compilationResult;

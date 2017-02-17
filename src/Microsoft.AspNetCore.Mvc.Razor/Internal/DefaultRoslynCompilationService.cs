@@ -53,16 +53,22 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         }
 
         /// <inheritdoc />
-        public CompilationResult Compile(RazorCodeDocument codeDocument, RazorCSharpDocument cSharpDocument)
+        public CompilationResult Compile(RazorTemplateEngineResult templateEngineResult)
         {
-            if (codeDocument == null)
+            var codeDocument = templateEngineResult.CodeDocument;
+            var cSharpDocument = templateEngineResult.CSharpDocument;
+            if (templateEngineResult.CodeDocument == null)
             {
-                throw new ArgumentNullException(nameof(codeDocument));
+                throw new ArgumentException(Resources.FormatPropertyMustBeSet(
+                    nameof(templateEngineResult.CodeDocument), 
+                    nameof(templateEngineResult)));
             }
 
-            if (cSharpDocument == null)
+            if (templateEngineResult.CSharpDocument == null)
             {
-                throw new ArgumentNullException(nameof(codeDocument));
+                throw new ArgumentException(Resources.FormatPropertyMustBeSet(
+                    nameof(templateEngineResult.CSharpDocument),
+                    nameof(templateEngineResult)));
             }
 
             _logger.GeneratedCodeToAssemblyCompilationStart(codeDocument.Source.Filename);
