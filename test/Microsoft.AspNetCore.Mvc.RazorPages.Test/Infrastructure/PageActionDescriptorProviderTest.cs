@@ -75,7 +75,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure
             razorProject.Setup(p => p.EnumerateItems("/"))
                 .Returns(new[]
                 {
-                    GetProjectItem("/", "/Test.cshtml", $"@page Home {Environment.NewLine}<h1>Hello world</h1>"),
+                    GetProjectItem("/", "/Test.cshtml", $"@page \"Home\" {Environment.NewLine}<h1>Hello world</h1>"),
                 });
             var provider = new PageActionDescriptorProvider(
                 razorProject.Object,
@@ -104,7 +104,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure
             razorProject.Setup(p => p.EnumerateItems("/"))
                 .Returns(new[]
                 {
-                    GetProjectItem("/", "/Test.cshtml", $"@page {template} {Environment.NewLine}<h1>Hello world</h1>"),
+                    GetProjectItem("/", "/Test.cshtml", $"@page \"{template}\" {Environment.NewLine}<h1>Hello world</h1>"),
                 });
             var provider = new PageActionDescriptorProvider(
                 razorProject.Object,
@@ -165,7 +165,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure
             razorProject.Setup(p => p.EnumerateItems("/"))
                 .Returns(new[]
                 {
-                    GetProjectItem("", "/Catalog/Details/Index.cshtml", $"@page {{id:int?}} {Environment.NewLine}"),
+                    GetProjectItem("", "/Catalog/Details/Index.cshtml", $"@page \"{{id:int?}}\" {Environment.NewLine}"),
                 });
             var provider = new PageActionDescriptorProvider(
                 razorProject.Object,
