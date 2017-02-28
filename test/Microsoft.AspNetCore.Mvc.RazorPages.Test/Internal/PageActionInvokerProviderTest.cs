@@ -3,6 +3,8 @@
 
 using System;
 using System.Diagnostics;
+using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -37,7 +39,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(object));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor));
             var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
             var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
             actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
@@ -70,6 +72,67 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
         }
 
         [Fact]
+        public void OnProvidersExecuting_SetsHandlers()
+        {
+            // Arrange
+            var descriptor = new PageActionDescriptor
+            {
+                RelativePath = "Path1",
+                FilterDescriptors = new FilterDescriptor[0],
+            };
+            Func<PageContext, object> factory = _ => null;
+            Action<PageContext, object> releaser = (_, __) => { };
+            Func<PageContext, object> modelFactory = _ => null;
+            Action<PageContext, object> modelDisposer = (_, __) => { };
+
+            var loader = new Mock<IPageLoader>();
+            loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
+                .Returns(CreateCompiledPageActionDescriptor(descriptor, typeof(TestSetPageWithModel)));
+            var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
+            var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
+            actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
+            var pageFactoryProvider = new Mock<IPageFactoryProvider>();
+            pageFactoryProvider.Setup(f => f.CreatePageFactory(It.IsAny<CompiledPageActionDescriptor>()))
+                .Returns(factory);
+            pageFactoryProvider.Setup(f => f.CreatePageDisposer(It.IsAny<CompiledPageActionDescriptor>()))
+                .Returns(releaser);
+
+            var modelFactoryProvider = new Mock<IPageModelFactoryProvider>();
+            modelFactoryProvider.Setup(f => f.CreateModelFactory(It.IsAny<CompiledPageActionDescriptor>()))
+                .Returns(modelFactory);
+            modelFactoryProvider.Setup(f => f.CreateModelDisposer(It.IsAny<CompiledPageActionDescriptor>()))
+                .Returns(modelDisposer);
+
+            var invokerProvider = CreateInvokerProvider(
+                loader.Object,
+                actionDescriptorProvider.Object,
+                pageFactoryProvider.Object,
+                modelFactoryProvider.Object);
+            var context = new ActionInvokerProviderContext(
+                new ActionContext(new DefaultHttpContext(), new RouteData(), descriptor));
+
+            // Act
+            invokerProvider.OnProvidersExecuting(context);
+
+            // Assert
+            Assert.NotNull(context.Result);
+            var actionInvoker = Assert.IsType<PageActionInvoker>(context.Result);
+            var entry = actionInvoker.CacheEntry;
+
+            Assert.Collection(entry.ActionDescriptor.HandlerMethods,
+                handlerDescriptor =>
+                {
+                    Assert.Equal(nameof(TestSetPageModel.OnGet), handlerDescriptor.Method.Name);
+                    Assert.NotNull(handlerDescriptor.Executor);
+                },
+                handlerDescriptor =>
+                {
+                    Assert.Equal(nameof(TestSetPageModel.OnPost), handlerDescriptor.Method.Name);
+                    Assert.NotNull(handlerDescriptor.Executor);
+                });
+        }
+
+        [Fact]
         public void OnProvidersExecuting_WithModel_PopulatesCacheEntry()
         {
             // Arrange
@@ -85,7 +148,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(PageWithModel));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor, pageType: typeof(PageWithModel)));
             var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
             var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
             actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
@@ -137,7 +200,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(PageWithModel));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor, pageType: typeof(PageWithModel)));
             var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
             var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
             actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
@@ -184,7 +247,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(PageWithModel));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor, pageType: typeof(PageWithModel)));
             var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
             var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
             actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
@@ -215,7 +278,6 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 });
         }
 
-
         [Fact]
         public void OnProvidersExecuting_CachesEntries()
         {
@@ -227,7 +289,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             };
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(object));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor));
             var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
             var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
             actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
@@ -274,7 +336,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             var loader = new Mock<IPageLoader>();
             loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
-                .Returns(typeof(object));
+                .Returns(CreateCompiledPageActionDescriptor(descriptor));
             var invokerProvider = CreateInvokerProvider(
                  loader.Object,
                  actionDescriptorProvider.Object);
@@ -297,6 +359,23 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             actionInvoker = Assert.IsType<PageActionInvoker>(context.Result);
             var entry2 = actionInvoker.CacheEntry;
             Assert.NotSame(entry1, entry2);
+        }
+
+        private static CompiledPageActionDescriptor CreateCompiledPageActionDescriptor(
+            PageActionDescriptor descriptor,
+            Type pageType = null)
+        {
+            TypeInfo modelTypeInfo = null;
+            if (pageType != null)
+            {
+                modelTypeInfo = pageType.GetTypeInfo().GetProperty("Model")?.PropertyType.GetTypeInfo();
+            }
+
+            return new CompiledPageActionDescriptor(descriptor)
+            {
+                ModelTypeInfo = modelTypeInfo,
+                PageTypeInfo = (pageType ?? typeof(object)).GetTypeInfo()
+            };
         }
 
         private static PageActionInvokerProvider CreateInvokerProvider(
@@ -332,6 +411,25 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 razorProject,
                 new DiagnosticListener("Microsoft.AspNetCore"),
                 NullLoggerFactory.Instance);
+        }
+
+
+        private class TestSetPageWithModel
+        {
+            public TestSetPageModel Model { get; set; }
+        }
+
+        private class TestSetPageModel
+        {
+            public void OnGet()
+            {
+
+            }
+
+            public void OnPost()
+            {
+
+            }
         }
 
         private class PageWithModel

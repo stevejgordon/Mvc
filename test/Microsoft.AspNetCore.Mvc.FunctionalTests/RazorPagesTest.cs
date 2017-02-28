@@ -1,7 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -68,6 +67,31 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
         }
 
         [Fact]
+        public async Task HelloWorldWithPageModelHandler_CanPostContent()
+        {
+            // Arrange
+            var getRequest = new HttpRequestMessage(HttpMethod.Get, "http://localhost/HelloWorldWithPageModelHandler?message=message");
+            var getResponse = await Client.SendAsync(getRequest);
+            var getResponseBody = await getResponse.Content.ReadAsStringAsync();
+            var formToken = AntiforgeryTestHelper.RetrieveAntiforgeryToken(getResponseBody, "/HelloWorlWithPageModelHandler");
+            var cookie = AntiforgeryTestHelper.RetrieveAntiforgeryCookie(getResponse);
+
+
+            var postRequest = new HttpRequestMessage(HttpMethod.Post, "http://localhost/HelloWorldWithPageModelHandler");
+            postRequest.Headers.Add("Cookie", cookie.Key + "=" + cookie.Value);
+            postRequest.Headers.Add("RequestVerificationToken", formToken);
+
+            // Act
+            var response = await Client.SendAsync(postRequest);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.StartsWith("Hello, You posted!", content.Trim());
+        }
+
+        [Fact]
         public async Task HelloWorldWithPageModelHandler_CanGetContent()
         {
             // Arrange
@@ -89,10 +113,10 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             // Arrange 1
             var url = "http://localhost/TempData/SetTempDataOnPageAndRedirect?message=Hi1";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            
+
             // Act 1
             var response = await Client.SendAsync(request);
-            
+
             // Assert 1
             Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
