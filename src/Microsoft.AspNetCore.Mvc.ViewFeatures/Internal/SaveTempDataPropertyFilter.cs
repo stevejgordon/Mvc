@@ -3,10 +3,14 @@
 
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Microsoft.AspNetCore.Mvc.ViewFeatures.Internal
 {
-    public class SaveTempDataPropertyFilter : ISaveTempDataCallback
+    /// <summary>
+    /// A filter that saves properties with the <see cref="TempDataAttribute"/>. 
+    /// </summary>
+    public class SaveTempDataPropertyFilter : ISaveTempDataCallback, IActionFilter
     {
         public string Prefix { get; set; }
 
@@ -14,6 +18,24 @@ namespace Microsoft.AspNetCore.Mvc.ViewFeatures.Internal
 
         public IDictionary<PropertyInfo, object> OriginalValues { get; set; }
 
+        private TempDataPropertyProvider _propertyProvider = new TempDataPropertyProvider();
+
+        private readonly ITempDataDictionaryFactory _factory;
+
+        /// <summary>
+        /// Creates a new instance of <see cref="SaveTempDataPropertyFilter"/>.
+        /// </summary>
+        /// <param name="factory">The <see cref="ITempDataDictionaryFactory"/>.</param>
+        public SaveTempDataPropertyFilter(ITempDataDictionaryFactory factory)
+        {
+            _factory = factory;
+        }
+
+        /// <summary>
+        /// Compares the originally saved value for the property in <see cref="ITempDataDictionary"/>
+        /// to the newly assigned value; updating if necessary.
+        /// </summary>
+        /// <param name="tempData">The <see cref="ITempDataDictionary"/>.</param>
         public void OnTempDataSaving(ITempDataDictionary tempData)
         {
             if (Subject != null && OriginalValues != null)
@@ -24,12 +46,27 @@ namespace Microsoft.AspNetCore.Mvc.ViewFeatures.Internal
                     var originalValue = kvp.Value;
 
                     var newValue = property.GetValue(Subject);
-                    if (newValue != null && newValue != originalValue)
+                    if (newValue != null && !newValue.Equals(originalValue))
                     {
                         tempData[Prefix + property.Name] = newValue;
                     }
                 }
             }
         }
+
+        /// <inheritdoc />
+        public void OnActionExecuting(ActionExecutingContext context)
+        {
+            Prefix = TempDataPropertyProvider.Prefix;
+            Subject = context.Controller;
+            var tempData = _factory.GetTempData(context.HttpContext);
+            OriginalValues = _propertyProvider.LoadAndTrackChanges(Subject, tempData);
+        }
+
+        /// <inheritdoc />
+        public void OnActionExecuted(ActionExecutedContext context)
+        {
+        }
     }
 }
+
