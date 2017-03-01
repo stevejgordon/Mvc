@@ -85,7 +85,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure
                 model.Selectors.Add(CreateSelectorModel(parentDirectoryPath, template));
             }
 
-            model.Filters.Add(new SaveTempDataPropertyFilter()); // Support for [TempData] on properties
+            model.Filters.Add(new SaveTempDataPropertyFilterProvider()); // Support for [TempData] on properties
             model.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()); // Always require an antiforgery token on post
 
             for (var i = 0; i < _pagesOptions.Conventions.Count; i++)
