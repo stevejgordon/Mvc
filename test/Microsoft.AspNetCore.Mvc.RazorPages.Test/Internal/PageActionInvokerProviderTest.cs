@@ -363,8 +363,8 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
         [Fact]
         public void CorrectTypeChosenByCreateCacheEntry()
-       {
-         throw new NotImplementedException();
+        {
+            throw new NotImplementedException();
         }
 
         [Fact]
@@ -393,6 +393,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             var factories = invokerProvider.GetPageStartFactories(compiledDescriptor);
 
             // Assert
+            Assert.True(false);
             throw new NotImplementedException();
         }
 
@@ -453,7 +454,6 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 new DiagnosticListener("Microsoft.AspNetCore"),
                 NullLoggerFactory.Instance);
         }
-
 
         private class TestSetPageWithModel
         {
