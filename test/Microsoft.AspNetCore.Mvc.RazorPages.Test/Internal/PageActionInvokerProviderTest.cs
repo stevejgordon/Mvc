@@ -361,6 +361,47 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             Assert.NotSame(entry1, entry2);
         }
 
+        [Fact]
+        public void CorrectTypeChosenByCreateCacheEntry()
+       {
+         throw new NotImplementedException();
+        }
+
+        [Fact]
+        public void GetPageStartFactories()
+        {
+            // Arrange
+            var descriptor = new PageActionDescriptor
+            {
+                RelativePath = "Path1",
+                FilterDescriptors = new FilterDescriptor[0],
+            };
+            var loader = new Mock<IPageLoader>();
+            loader.Setup(l => l.Load(It.IsAny<PageActionDescriptor>()))
+                .Returns(CreateCompiledPageActionDescriptor(descriptor));
+            var descriptorCollection = new ActionDescriptorCollection(new[] { descriptor }, version: 1);
+            var actionDescriptorProvider = new Mock<IActionDescriptorCollectionProvider>();
+            actionDescriptorProvider.Setup(p => p.ActionDescriptors).Returns(descriptorCollection);
+
+            var invokerProvider = CreateInvokerProvider(
+                loader.Object,
+                actionDescriptorProvider.Object);
+
+            var compiledDescriptor = CreateCompiledPageActionDescriptor(descriptor);
+
+            // Act
+            var factories = invokerProvider.GetPageStartFactories(compiledDescriptor);
+
+            // Assert
+            throw new NotImplementedException();
+        }
+
+        [Fact]
+        public void PopulateHandlerMethodDescriptors_FindsAll()
+        {
+            throw new NotImplementedException();
+        }
+        
         private static CompiledPageActionDescriptor CreateCompiledPageActionDescriptor(
             PageActionDescriptor descriptor,
             Type pageType = null)

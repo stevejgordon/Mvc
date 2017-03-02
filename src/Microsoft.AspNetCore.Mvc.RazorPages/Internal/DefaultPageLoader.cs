@@ -41,15 +41,13 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             {
                 throw new InvalidOperationException($"File {actionDescriptor.RelativePath} was not found.");
             }
-
-            RazorCodeDocument codeDocument;
-            RazorCSharpDocument cSharpDocument;
+            
             _logger.RazorFileToCodeCompilationStart(item.Path);
 
             var startTimestamp = _logger.IsEnabled(LogLevel.Debug) ? Stopwatch.GetTimestamp() : 0;
 
-            codeDocument = CreateCodeDocument(item);
-            cSharpDocument = _razorCompilationService.ProcessCodeDocument(codeDocument);
+            var codeDocument = CreateCodeDocument(item);
+            var cSharpDocument = _razorCompilationService.ProcessCodeDocument(codeDocument);
 
             _logger.RazorFileToCodeCompilationEnd(item.Path, startTimestamp);
 
@@ -67,9 +65,9 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
             // If a model type wasn't set in code then the model property's type will be the same
             // as the compiled type.
-            var compiledType = compilationResult.CompiledType.GetTypeInfo();
-            var modelType = compiledType.GetProperty(ModelPropertyName)?.PropertyType.GetTypeInfo();
-            if (modelType == compiledType)
+            var pageType = compilationResult.CompiledType.GetTypeInfo();
+            var modelType = pageType.GetProperty(ModelPropertyName)?.PropertyType.GetTypeInfo();
+            if (modelType == pageType)
             {
                 modelType = null;
             }
@@ -77,7 +75,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             return new CompiledPageActionDescriptor(actionDescriptor)
             {
                 ModelTypeInfo = modelType,
-                PageTypeInfo = compiledType,
+                PageTypeInfo = pageType,
             };
         }
 

@@ -196,7 +196,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 cachedFilters);
         }
 
-        private List<Func<IRazorPage>> GetPageStartFactories(CompiledPageActionDescriptor descriptor)
+        internal List<Func<IRazorPage>> GetPageStartFactories(CompiledPageActionDescriptor descriptor)
         {
             var pageStartFactories = new List<Func<IRazorPage>>();
             var pageStartItems = _razorProject.FindHierarchicalItems(descriptor.ViewEnginePath, PageStartFileName);
@@ -212,7 +212,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             return pageStartFactories;
         }
 
-        private static void PopulateHandlerMethodDescriptors(TypeInfo type, CompiledPageActionDescriptor actionDescriptor)
+        internal static void PopulateHandlerMethodDescriptors(TypeInfo type, CompiledPageActionDescriptor actionDescriptor)
         {
             var methods = type.GetMethods();
             for (var i = 0; i < methods.Length; i++)
