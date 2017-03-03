@@ -104,7 +104,7 @@ namespace Microsoft.AspNetCore.Mvc.FunctionalTests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var content = await response.Content.ReadAsStringAsync();
-            Assert.Equal("Hello, pagemodel!", content.Trim());
+            Assert.StartsWith("Hello, pagemodel!", content.Trim());
         }
 
         [Fact]

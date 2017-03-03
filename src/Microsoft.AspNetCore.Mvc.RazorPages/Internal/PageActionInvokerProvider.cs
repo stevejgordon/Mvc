@@ -118,6 +118,14 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
 
         }
 
+        internal InnerCache TestCache
+        {
+            get
+            {
+                return _currentCache;
+            }
+        }
+
         private InnerCache CurrentCache
         {
             get
@@ -145,10 +153,10 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
                 actionContext,
                 new ViewDataDictionary(_modelMetadataProvider, actionContext.ModelState),
                 tempData,
-                _htmlHelperOptions);
-
-            pageContext.ActionDescriptor = cacheEntry.ActionDescriptor;
-
+                _htmlHelperOptions)
+            {
+                ActionDescriptor = cacheEntry.ActionDescriptor
+            };
             return new PageActionInvoker(
                 _selector,
                 _propertyProvider,
@@ -230,7 +238,7 @@ namespace Microsoft.AspNetCore.Mvc.RazorPages.Internal
             }
         }
 
-        private class InnerCache
+        internal class InnerCache
         {
             public InnerCache(int version)
             {
